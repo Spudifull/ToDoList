@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>ToDo List</title>
+    <link rel="stylesheet" href="/style.css">
+    <!-- Подключите дополнительные CSS и JavaScript по мере необходимости -->
+</head>
+<body>
+<div class="main-container">
+    <h1>ToDo List</h1>
+    <button id="openImportModalBtn" onclick="modalExport()">Импорт ZIP-архива</button>
+    <form class="task-form" th:action="@{/api/tasks/create}" method="post" enctype="multipart/form-data">
+        <div class="form-group">
+            <label for="title">Название задачи:</label>
+            <input type="text" id="title" name="title" class="form-control">
+        </div>
+        <div class="form-group">
+            <label for="description">Описание задачи:</label>
+            <textarea id="description" name="description" class="form-control"></textarea>
+        </div>
+        <div class="form-group file-upload-group">
+            <label for="file">Прикрепить файл:</label>
+            <input type="file" id="file" name="files" class="file-input" multiple>
+        </div>
+        <div class="form-group">
+            <label for="categoryID">Категория:</label>
+            <select id="categoryID" name="categoryID" class="form-control">
+                <option value="1">Личное</option>
+                <option value="2">Работа</option>
+                <option value="3">Учеба</option>
+                <option value="4">Иное</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="tagID">Тэг:</label>
+            <select id="tagID" name="tagID" class="form-control">
+                <option value="1">Срочно</option>
+                <option value="2">Средний приоритет</option>
+                <option value="3">Низкий приоритет</option>
+            </select>
+        </div>
+        <div class="form-actions">
+            <button type="button" onclick="createTask()" class="btn btn-primary">Создать задачу</button>
+        </div>
+    </form>
+
+    <button type="button" onclick="sortByDate()" class="btn btn-secondary">Сортировать по дате</button>
+    <button type="button" onclick="sortByTitle()" class="btn btn-secondary">Сортировать по названию</button>
+
+    <select id="tagFilter" onchange="filterTasksByTagId()">
+        <option value="">Все задачи</option>
+        <option value="1">Срочно</option>
+        <option value="2">Средней срочности</option>
+        <option value="3">Низкой срочности</option>
+        <!-- Добавьте дополнительные опции по мере необходимости -->
+    </select>
+
+    <div class="tasks-container">
+        <div th:each="task : ${tasks}" class="task">
+            <div class="task-details">
+                <span class="time" th:text="${#dates.format(task.creationDate, 'dd.MM.yyyy HH:mm')}">Время</span>
+                <h3 th:text="${task.title}">Заголовок задачи</h3>
+                <p th:text="${task.description}">Описание задачи</p>
+            </div>
+            <!-- Отображение прикрепленных файлов -->
+            <div th:each="file : ${task.files}" class="task-file">
+                <a th:href="@{'/api/tasks/files/download/' + ${file.id}}" th:title="${file.filePath}">
+                    <!-- Иконки для разных типов файлов -->
+                    <img th:if="${file.fileType.contains('pdf')}" src="/icons/pdf.png" alt="PDF" class="file-icon"/>
+                    <img th:if="${file.fileType.startsWith('image/')}" src="/icons/img.png" alt="Image" class="file-icon"/>
+                    <img th:if="${file.fileType.contains('text/plain')}" src="/icons/txt.png" alt="Text" class="file-icon"/>
+                    <img th:if="${!file.fileType.contains('pdf') and !file.fileType.startsWith('image/') and !file.fileType.contains('text/plain')}" src="/icons/other.png" alt="File" class="file-icon"/>
+                </a>
+            </div>
+            <!-- Метаданные задачи (категория и тэг) и действия -->
+            <div class="task-meta">
+                <div class="task-header">
+                    <span th:class="'task-category category-' + ${task.category.name}" th:text="${task.category.name}">Категория</span>
+                    <span th:class="'task-tag tag-' + ${task.tag.name}" th:text="${task.tag.name}">Тэг</span>
+                </div>
+                <div class="task-actions">
+                    <!-- Кнопка экспорта -->
+                    <button type="button" th:data-task-id="${task.id}" onclick="exportTask(this)">Экспорт</button>
+                    <!-- Кнопки для удаления и редактирования задачи -->
+                    <button type="button" th:onclick="'deleteTask(' + ${task.id} + ')'">&#10060; Удалить</button>
+                    <button type="button"
+                            th:data-task-id="${task.id}"
+                            th:data-task-title="${task.title}"
+                            th:data-task-description="${task.description}"
+                            th:data-category-id="${task.category.id}"
+                            th:data-tag-id="${task.tag.id}"
+                            th:data-files="${#strings.toString(task.files)}"
+                            onclick="editTask(this)">
+                        &#9998; Редактировать
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="editModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2>Редактировать задачу</h2>
+        <form id="editForm">
+            <input type="hidden" id="editTaskId">
+
+            <div class="form-group">
+                <label for="editTitle">Название задачи:</label>
+                <input type="text" id="editTitle" name="title" class="form-control">
+            </div>
+
+            <div class="form-group">
+                <label for="editDescription">Описание задачи:</label>
+                <textarea id="editDescription" name="description" class="form-control"></textarea>
+            </div>
+
+            <div class="form-group file-upload-group">
+                <label for="editFile">Прикрепить файл:</label>
+                <input type="file" id="editFile" name="files" class="file-input" multiple>
+            </div>
+
+            <div class="form-group">
+                <label for="editCategoryID">Категория:</label>
+                <select id="editCategoryID" name="categoryID" class="form-control">
+                    <option value="1">Личное</option>
+                    <option value="2">Работа</option>
+                    <option value="3">Учеба</option>
+                    <option value="4">Иное</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="editTagID">Тэг:</label>
+                <select id="editTagID" name="tagID" class="form-control">
+                    <option value="1">Срочно</option>
+                    <option value="2">Средний приоритет</option>
+                    <option value="3">Низкий приоритет</option>
+                </select>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" onclick="submitEdit()" class="btn btn-primary">Сохранить изменения</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="myUniqueModal" class="custom-modal">
+    <div class="custom-modal-content">
+        <span class="close" onclick="closeModalExport()">&times;</span>
+        <h2>Импорт задачи</h2>
+        <div class="form-group file-upload-group">
+            <label for="editFile">Прикрепить zip архив:</label>
+            <form id="zipForm">
+                <input type="file" name="zip" accept=".zip">
+            </form>
+        </div>
+        <input type="button" value="Загрузить и обработать" onclick="submitZip()" class="btn btn-primary">
+    </div>
+</div>
+
+</body>
+</html>
+
+<script>
+    function createTask() {
+        const form = document.querySelector('.task-form');
+        const formData = new FormData(form);
+
+        for (let [key, value] of formData.entries()) {
+            console.log(key, value);
+        }
+
+        fetch(form.action, {  // Получить URL из атрибута действия формы
+            method: 'POST',
+            body: formData
+        })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/tasks'; // Перенаправить пользователя
+                } else {
+                    alert('Response not ok');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
+
+    function deleteTask(taskId) {
+        if (!confirm('Вы уверены, что хотите удалить эту задачу?')) {
+            return;
+        }
+        fetch('/api/tasks/delete/' + taskId, {
+            method: 'DELETE'
+        })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/tasks';
+                } else {
+                    alert('Не удалось удалить задачу');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    }
+
+    function editTask(button) {
+        // Получение данных из атрибутов кнопки
+        const taskId = button.getAttribute('data-task-id');
+        const taskTitle = button.getAttribute('data-task-title');
+        const taskDescription = button.getAttribute('data-task-description');
+        const categoryId = button.getAttribute('data-category-id');
+        const tagId = button.getAttribute('data-tag-id');
+
+        // Заполнение формы данными
+        document.getElementById('editTaskId').value = taskId;
+        document.getElementById('editTitle').value = taskTitle;
+        document.getElementById('editDescription').value = taskDescription;
+        document.getElementById('editCategoryID').value = categoryId;
+        document.getElementById('editTagID').value = tagId;
+
+        // Отображение модального окна
+        document.getElementById('editModal').style.display = "block";
+    }
+
+        // Функция для закрытия модального окна
+    function closeModal() {
+        document.getElementById('editModal').style.display = "none";
+    }
+
+    // Функция для отправки отредактированных данных
+    function submitEdit() {
+        const taskId = document.getElementById('editTaskId').value;
+        const title = document.getElementById('editTitle').value;
+        const description = document.getElementById('editDescription').value;
+        const categoryId = document.getElementById('editCategoryID').value; // Получаем ID категории
+        const tagId = document.getElementById('editTagID').value; // Получаем ID тега
+
+        // Собираем данные формы, включая файлы
+        const formData = new FormData();
+        formData.append('title', title);
+        formData.append('description', description);
+        formData.append('categoryId', categoryId);
+        formData.append('tagId', tagId);
+
+        // Добавляем файлы
+        const files = document.getElementById('editFile').files;
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
+
+        fetch('/api/tasks/edit/' + taskId, {
+            method: 'PUT',
+            body: formData
+        })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/tasks';
+                } else {
+                    alert('Failed to update task');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+
+        closeModal();
+    }
+
+    function sortByDate() {
+        window.location.href = '/tasks/sortedByDate';
+    }
+
+    function sortByTitle() {
+        window.location.href = '/tasks/sortedByTitle';
+    }
+
+    function exportTask(button) {
+        const taskId = button.getAttribute('data-task-id');
+        const exportUrl = '/api/tasks/export/' + taskId;
+
+        window.location.href = exportUrl;
+    }
+
+    function filterTasksByTagId() {
+        const selectedTagId = document.getElementById('tagFilter').value;
+        window.location.href = `/tasks/filterByTagId?tagId=${selectedTagId}`;
+        localStorage.setItem('selectedTagId', selectedTagId);
+    }
+
+    function modalExport(){
+        document.getElementById('myUniqueModal').style.display = "block";
+    }
+
+    function closeModalExport() {
+        document.getElementById('myUniqueModal').style.display = "none";
+    }
+
+    function submitZip() {
+        const form = document.getElementById('zipForm');
+        const formData = new FormData(form);
+
+        fetch('/api/tasks/processZip', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
+                }
+                throw new Error('Сетевая ошибка при отправке данных');
+            })
+            .then(text => {
+                alert(text); // Вывод сообщения от сервера или дальнейшая обработка
+            })
+            .catch(error => {
+                console.error('Ошибка:', error);
+            });
+
+        return false;
+    }
+
+    document.addEventListener('DOMContentLoaded', (event) => {
+        const selectedTagId = localStorage.getItem('selectedTagId');
+        if (selectedTagId) {
+            document.getElementById('tagFilter').value = selectedTagId;
+        }
+    });
+
+
+</script>
