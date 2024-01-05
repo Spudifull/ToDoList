@@ -7,7 +7,6 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.ToString;
-import javax.validation.constraints.*;
 
 
 import java.util.List;
@@ -45,10 +44,18 @@ public class Task {
     @JoinColumn(name = "tag_id", nullable = false)
     private Tag tag;
 
+    public Task(long l, String cleanHouse, String descriptionHere) {
+        id = l;
+        title = cleanHouse;
+        description = descriptionHere;
+    }
+
     @PrePersist
     protected void onCreate(){
         creationDate = new Date();
     }
+
+
 }
 
 

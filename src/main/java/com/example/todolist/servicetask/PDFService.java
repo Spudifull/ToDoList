@@ -1,28 +1,18 @@
 package com.example.todolist.servicetask;
 
-import com.example.todolist.repository.FileRepository;
-import com.example.todolist.repository.Repository;
-import jakarta.servlet.http.HttpServletResponse;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.rendering.PDFRenderer;
-import org.springframework.core.io.Resource;
-import org.springframework.http.ResponseEntity;
+import com.spire.pdf.PdfDocument;
+import com.spire.pdf.graphics.PdfImageType;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import com.example.todolist.model.File;
+import java.io.*;
 
-import java.nio.file.Files;
+
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
+
 
 @Service
 public class PDFService {
@@ -38,33 +28,44 @@ public class PDFService {
      * @param baseName Базовое имя для сохраняемых изображений (обычно имя исходного PDF-файла).
      * @return Список путей к созданным изображениям.
      */
-    public List<Path> convertPDFToImages(InputStream pdfInputStream, Path outputDir, String baseName){
+    public List<Path> convertPDFToImages(InputStream pdfInputStream, Path outputDir, String baseName) throws IOException {
         // Список для хранения путей созданных изображений
         List<Path> imagePaths = new ArrayList<>();
 
+        // Создание временного файла из InputStream
+        java.io.File tempPdfFile = java.io.File.createTempFile("pdf_to_convert", ".pdf");
+        tempPdfFile.deleteOnExit();
 
-        try(PDDocument document = PDDocument.load(pdfInputStream)){
-            // Инициализация рендерера для PDF
-            PDFRenderer renderer = new PDFRenderer(document);
-
-            // Перебор всех страниц PDF-документа
-            for(int page = 0; page < document.getNumberOfPages(); ++page){
-                BufferedImage image = renderer.renderImageWithDPI(page, 300);
-
-                // Определение пути сохранения изображения
-                Path imagePath = outputDir.resolve(baseName + "-page-" + page + ".png");
-
-                // Сохранение изображения на диск
-                ImageIO.write(image, "PNG", imagePath.toFile());
-
-                // Добавление пути в список
-                imagePaths.add(imagePath);
-                }
-        }catch(Exception exception){
-            // Логирование в случае возникновения исключений при обработке PDF
-                exception.printStackTrace();
+        try (FileOutputStream out = new FileOutputStream(tempPdfFile)) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = pdfInputStream.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
-            return imagePaths;
+
+        // Загрузка PDF документа из временного файла
+        PdfDocument pdf = new PdfDocument();
+        pdf.loadFromFile(tempPdfFile.getAbsolutePath());
+
+        // Конвертация каждой страницы в изображение
+        for (int i = 0; i < pdf.getPages().getCount(); i++) {
+            BufferedImage image = pdf.saveAsImage(i, PdfImageType.Bitmap, 500, 500);
+
+            // Определение пути и имени файла
+            Path imagePath = outputDir.resolve(String.format(baseName + "-page-%d.png", i));
+
+            // Сохранение изображения
+            ImageIO.write(image, "PNG", imagePath.toFile());
+            imagePaths.add(imagePath);
+        }
+
+        // Освобождение ресурсов PDF документа
+        pdf.close();
+
+        return imagePaths;
     }
 
 }

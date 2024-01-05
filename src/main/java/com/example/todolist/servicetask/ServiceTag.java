@@ -1,9 +1,6 @@
 package com.example.todolist.servicetask;
 
-import com.example.todolist.model.Category;
 import com.example.todolist.model.Tag;
-import com.example.todolist.model.Task;
-import com.example.todolist.repository.TagRepository;
 import com.example.todolist.repository.TagRepository;
 import org.springframework.stereotype.Service;
 

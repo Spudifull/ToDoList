@@ -242,7 +242,7 @@ public class APIController {
             zippedOut.write(jsonContent.getBytes());
             zippedOut.closeEntry();
 
-            // Обработка и добавление файлов к задач
+            // Обработка и добавление файлов к задаче
             for (File fileEntiti: files){
                 // Пропускаем PDF файлы, так как они не должны быть включены в экспорт(переводим PDF в фото)
                 if(Objects.equals(fileEntiti.getFileType(), "application/pdf")){

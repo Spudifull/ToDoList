@@ -2,7 +2,6 @@ package com.example.todolist.servicetask;
 
 import com.example.todolist.model.File;
 import com.example.todolist.model.Task;
-import com.example.todolist.repository.FileRepository;
 import com.example.todolist.repository.Repository;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,7 +18,7 @@ import java.util.Objects;
 public class ServiceTask {
     private final Repository repository;
 
-    public ServiceTask(Repository repository, FileRepository fileRepository){
+    public ServiceTask(Repository repository){
         this.repository = repository;
     }
 
@@ -35,9 +34,6 @@ public class ServiceTask {
         return repository.findByTitle(title);
     }
 
-    public List<Task> findAllTasksOrderByCreationDate() {
-        return repository.findAllByOrderByCreationDate();
-    }
 
     public Task saveTask(Task task) {
         return repository.save(task);
@@ -70,7 +66,7 @@ public class ServiceTask {
         ObjectMapper mapper = new ObjectMapper();
 
         // Конфигурация для обработки не-ASCII символов, если требуется
-        mapper.getFactory().configure(JsonGenerator.Feature.ESCAPE_NON_ASCII, false); //не уверен что эта строка нужна, но пока оставил
+        mapper.getFactory().configure(JsonGenerator.Feature.ESCAPE_NON_ASCII, false); //не уверен, что эта строка нужна, но пока оставил
 
         // Создание корневого узла JSON
         ObjectNode rootNode = mapper.createObjectNode();

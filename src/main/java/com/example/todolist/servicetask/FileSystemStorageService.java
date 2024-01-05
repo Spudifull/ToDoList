@@ -304,7 +304,7 @@ public class FileSystemStorageService implements FileSystemStorage {
             try (InputStream inputStream = new FileInputStream(file)) {
                 if (Objects.equals(fileEntity.getFileType(), "application/pdf")) {
                     // Конвертация PDF в изображения и сохранение каждого из них
-                    List<Path> imagePaths = pdfService.convertPDFToImages(inputStream, this.dirlocation,fileName);
+                    List<Path> imagePaths = pdfService.convertPDFToImages(inputStream, this.dirlocation, fileName);
 
                     for (Path imagePath : imagePaths){
                         File imageEntity = new File();
